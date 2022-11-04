@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Rinsvent\Exception;
 
 use Exception;
@@ -7,20 +9,40 @@ use Throwable;
 
 abstract class AbstractException extends Exception
 {
-    public static string $idRegisterClass = IdRegister::class;
-    public static ?int $rootExceptionPosition = null;
+    public static string $exceptionEnum = '';
+
+    private const ERROR_MESSAGE = 'Use AbstractException::$exceptionEnum = ExceptionEnum::class; You can set any instance of CodeInterface';
 
     protected ?string $codeText = null;
 
     public function __construct($message = "", Throwable $previous = null)
     {
-        $this->codeText = $this->codeText ?? $this->grabCodeText();
-        parent::__construct($message, self::$idRegisterClass::MAP[static::class] ?? 0, $previous);
+        if (!enum_exists(self::$exceptionEnum)) {
+            throw new \Exception(self::ERROR_MESSAGE);
+        }
+        if (!is_subclass_of(self::$exceptionEnum, CodeInterface::class)) {
+            throw new \Exception(self::ERROR_MESSAGE);
+        }
+        $exceptionEnum = self::$exceptionEnum::tryFrom(static::class);
+        parent::__construct($message, $exceptionEnum?->value() ?? 0, $previous);
     }
 
     public function getCodeText(): string
     {
-        return $this->codeText;
+        return $this->codeText ?? $this->grabCodeText();
+    }
+
+    public function getSummary(): string
+    {
+        if ($message = $this->getMessage()) {
+            return $message;
+        }
+
+        $rc = new \ReflectionClass(static::class);
+        $shortName = $rc->getShortName();
+        $shortName = Inflector::tableize($shortName);
+        $shortName = str_replace('_', ' ', $shortName);
+        return ucfirst($shortName);
     }
 
     private function grabCodeText(): string
@@ -28,16 +50,13 @@ abstract class AbstractException extends Exception
         $class = static::class;
 
         $classParts = explode('\\', $class);
-        $classParts = array_reverse($classParts);
-        $position = self::$rootExceptionPosition ?? array_search('Exception', $classParts, true);
-        $classParts = array_reverse($classParts);
+        $position = array_search('Exception', $classParts, true);
         $classParts = array_slice($classParts, $position);
 
-        $result = [];
-        foreach ($classParts as $classPart) {
-            $result[] = Inflector::tableize($classPart);
-        }
-
+        $result = array_map(
+            static fn (string $classPart) => Inflector::tableize($classPart),
+            $classParts
+        );
         return implode('.', $result);
     }
 }
