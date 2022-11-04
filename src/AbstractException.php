@@ -23,8 +23,9 @@ abstract class AbstractException extends Exception
         if (!is_subclass_of(self::$exceptionEnum, CodeInterface::class)) {
             throw new \Exception(self::ERROR_MESSAGE);
         }
+        /** @var CodeInterface $exceptionEnum */
         $exceptionEnum = self::$exceptionEnum::tryFrom(static::class);
-        parent::__construct($message, $exceptionEnum?->value() ?? 0, $previous);
+        parent::__construct($message, $exceptionEnum?->code() ?? 0, $previous);
     }
 
     public function getCodeText(): string
